@@ -1,127 +1,26 @@
 <template>
   <div id="home">
     <nav-bar class="home-nav"><div slot="center">购物街</div></nav-bar>
-    <home-swiper :banners="banners"></home-swiper>
-    <home-recommend-view :recommends="recommends"></home-recommend-view>
-    <featrure-view></featrure-view>
-    <tab-control :titles="['流行','新款','精选']" class="tab-control" @tabClick="tabClick"></tab-control>
-    <goods-list :goods="showGoods"/>
-    <ul>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-    </ul>
-    <ul>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-      <li>**</li>
-    </ul>
+    <tab-control :titles="['流行','新款','精选']" @tabClick="tabClick" ref="tabControl" class="tab-control" v-show="isTabFixed"></tab-control>
+    <scroll class="content" ref="scroll" :probe-type="3" @scroll="contentScroll" :pull-up-load="true" @pullingUp="loadMore">
+      <home-swiper :banners="banners" @swiperImageLoad="swiperImageLoad"></home-swiper>
+      <home-recommend-view :recommends="recommends"></home-recommend-view>
+      <featrure-view></featrure-view>
+      <tab-control :titles="['流行','新款','精选']" @tabClick="tabClick" ref="tabControl"></tab-control>
+      <goods-list :goods="showGoods"/>
+    </scroll>
+    <back-top @click.native='backClick' v-show="isShowBackTop"/>
   </div>
 </template>
 
 <script>
   import NavBar from 'components/common/navbar/NavBar'
-  import TabControl from 'components/content/tabControl/TabControl';
+  import TabControl from 'components/content/tabControl/TabControl'
+  import Scroll from 'components/common/scroll/Scroll'
+  import BackTop from 'components/content/backTop/BackTop'
 
   import {getHomeMultidata, getHomeGoods} from 'network/home'
+  import {debounce} from 'common/utils'
   
   import HomeSwiper from './childComps/HomeSwiper'
   import HomeRecommendView from './childComps/HomeRecommendView'
@@ -139,7 +38,11 @@
           'new': {page: 0, list: []},
           'sell': {page: 0, list: []},
         },
-        currentType: 'pop'
+        currentType: 'pop',
+        isShowBackTop: false,
+        tabOffsetTop: 0,
+        isTabFixed: false,
+        saveY: 0
       }
     },
     components: {
@@ -148,7 +51,9 @@
       HomeRecommendView,
       FeatrureView,
       TabControl,
-      GoodsList
+      GoodsList,
+      Scroll,
+      BackTop
     },
     computed: {
       showGoods() {
@@ -161,6 +66,23 @@
       this.getHomeGoods('pop');
       this.getHomeGoods('sell');
       this.getHomeGoods('new');
+    },
+    destroyed() {
+      console.log('destroyed');
+    },
+    activated() {
+      this.$refs.scroll.scrollTo(0, this.saveY, 0)
+      this.$refs.scroll.refresh()
+    },
+    deactivated() {
+      this.saveY = this.$refs.scroll.getScrollY()
+    },
+    mounted() {
+      // 监听item图片加载
+      const refresh = debounce(this.$refs.scroll.refresh,500)
+      this.$bus.$on('itemImageLoad', () => {
+        refresh()
+      })
     },
     methods: {
       /**
@@ -178,6 +100,26 @@
             this.currentType = 'sell'
             break
         }
+      },
+      backClick() {
+        this.$refs.scroll.scrollTo(0, 0, 500)
+      },
+      contentScroll(position) {
+        // 判断backtop是否显示
+        this.isShowBackTop = -(position.y) > 600
+        // 决定tabcontrol是否吸顶
+        this.isTabFixed = -(position.y) > this.tabOffsetTop
+      },
+      loadMore() {
+        console.log('上拉加载更多');
+        this.getHomeGoods(this.currentType)
+
+        this.$refs.scroll.finishPullUp()
+      },
+      swiperImageLoad() {
+        // 所有的组件都有一个属性$el，用于获取组件中的元素
+        this.tabOffsetTop = this.$refs.tabControl.$el.offsetTop
+        console.log(this.tabOffsetTop);
       },
       /**
        * 网络请求
@@ -205,23 +147,34 @@
 
 <style  scoped>
   #home {
-    padding-top: 44px;
+    /* padding-top: 44px; */
+    height: 100vh;
   }
 
   .home-nav {
     background-color: var(--color-tint);
     color: white;
 
-    position: fixed;
+    /* 原生才需要 */
+    /* position: fixed;
     left: 0;
     right: 0;
     top: 0;
-    z-index: 9;
+    z-index: 9; */
+  }
+
+  .content {
+    height: calc(100% - 95px);
+    overflow: hidden;
+    position: absolute;
+    top: 44px;
+    bottom: 49px;
+    left: 0;
+    right: 0;
   }
 
   .tab-control {
-    position: sticky;
-    top: 44px;
+    position: relative;
     z-index: 9;
   }
 </style>
