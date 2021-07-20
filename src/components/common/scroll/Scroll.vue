@@ -57,7 +57,7 @@
       },
       refresh() {
         this.scroll && this.scroll.refresh()
-        console.log('调用防抖函数');
+        // console.log('调用防抖函数');
       },
       getScrollY() {
         return this.scroll ? this.scroll.y : 0
@@ -66,5 +66,4 @@
   }
 </script>
 <style  scoped>
-
 </style>

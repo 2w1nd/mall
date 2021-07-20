@@ -1,7 +1,7 @@
 <template>
   <div id="home">
     <nav-bar class="home-nav"><div slot="center">购物街</div></nav-bar>
-    <tab-control :titles="['流行','新款','精选']" @tabClick="tabClick" ref="tabControl" class="tab-control" v-show="isTabFixed"></tab-control>
+    <tab-control :titles="['流行','新款','精选']" @tabClick="tabClick" ref="topTabControl" class="tab-control" v-show="isTabFixed"></tab-control>
     <scroll class="content" ref="scroll" :probe-type="3" @scroll="contentScroll" :pull-up-load="true" @pullingUp="loadMore">
       <home-swiper :banners="banners" @swiperImageLoad="swiperImageLoad"></home-swiper>
       <home-recommend-view :recommends="recommends"></home-recommend-view>
@@ -26,9 +26,11 @@
   import HomeRecommendView from './childComps/HomeRecommendView'
   import FeatrureView from './childComps/FeatrureView'
   import GoodsList from 'components/content/goods/GoodsList';
+  import {itemListenerMixin} from 'common/mixin'
 
   export default {
     name: 'Home',
+    mixins: [itemListenerMixin],
     data () {
       return {
         banners: [],
@@ -42,7 +44,8 @@
         isShowBackTop: false,
         tabOffsetTop: 0,
         isTabFixed: false,
-        saveY: 0
+        saveY: 0,
+        itemImgListener: null
       }
     },
     components: {
@@ -75,14 +78,13 @@
       this.$refs.scroll.refresh()
     },
     deactivated() {
+      // 1.保存y值
       this.saveY = this.$refs.scroll.getScrollY()
+      // 2.取消全局事件的监听
+      this.$bus.$off('itemImgLoad', this.itemImgListener)
     },
     mounted() {
-      // 监听item图片加载
-      const refresh = debounce(this.$refs.scroll.refresh,500)
-      this.$bus.$on('itemImageLoad', () => {
-        refresh()
-      })
+
     },
     methods: {
       /**
@@ -100,6 +102,9 @@
             this.currentType = 'sell'
             break
         }
+        // 让两个Tabcontrol的currentIndex保持一致
+        this.$refs.topTabControl.currentIndex = index
+        this.$refs.tabControl.currentIndex = index
       },
       backClick() {
         this.$refs.scroll.scrollTo(0, 0, 500)
@@ -111,7 +116,7 @@
         this.isTabFixed = -(position.y) > this.tabOffsetTop
       },
       loadMore() {
-        console.log('上拉加载更多');
+        // console.log('上拉加载更多');
         this.getHomeGoods(this.currentType)
 
         this.$refs.scroll.finishPullUp()
